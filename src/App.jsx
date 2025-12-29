@@ -215,21 +215,35 @@ export default function App() {
               <button onClick={() => setAgendaSubTab('impegni')} className={`flex-1 py-4 rounded-[2rem] font-black text-[10px] uppercase transition-all ${agendaSubTab === 'impegni' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>📅 Impegni</button>
               <button onClick={() => setAgendaSubTab('diario')} className={`flex-1 py-4 rounded-[2rem] font-black text-[10px] uppercase transition-all ${agendaSubTab === 'diario' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400'}`}>✍️ Diario</button>
             </div>
+            {/* SEZIONE DIARIO INTEGRALE - RIPRISTINATA CON VIDEO */}
             {agendaSubTab === 'diario' ? (
-              <section className="bg-white p-8 rounded-[3.5rem] border border-amber-100">
-                <div className="flex gap-4 mb-6">
-                  <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer">🖼️ <input type="file" className="hidden" /></label>
-                  <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer">🎙️ <input type="file" className="hidden" /></label>
-                </div>
-                <textarea className="w-full h-80 bg-amber-50/10 rounded-[2.5rem] p-8 text-sm outline-none shadow-inner italic" placeholder="Caro diario..." value={diaryEntry.testo} onChange={e=>setDiaryEntry({...diaryEntry, testo:e.target.value})} />
-                <button onClick={()=>{setIsSaving(true); setTimeout(()=>setIsSaving(false),1000)}} className="w-full mt-6 py-5 rounded-[2.5rem] font-black uppercase text-xs bg-amber-500 text-white shadow-xl">
-                  {isSaving ? '✅ Diario Salvato' : '💾 Salva Diario'}
-                </button>
-              </section>
-            ) : (
-              <div className="bg-white p-8 rounded-[3.5rem] text-center min-h-[400px]">
-                <h3 className="text-xs font-black uppercase text-indigo-500 mb-6 italic tracking-widest">Sincronizzazione Cloud Google Calendar</h3>
-              </div>
+              <section className="bg-white p-8 rounded-[3.5rem] border border-amber-100 text-left">
+              <div className="flex gap-4 mb-6">
+              <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer hover:bg-amber-100 transition-colors">
+                🖼️ <input type="file" accept="image/*" className="hidden" />
+              </label>
+              {/* RIPRISTINATO: ICONA VIDEO */}
+              <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer hover:bg-amber-100 transition-colors">
+                🎥 <input type="file" accept="video/*" className="hidden" />
+              </label>
+              <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer hover:bg-amber-100 transition-colors">
+                🎙️ <input type="file" accept="audio/*" className="hidden" />
+              </label>
+            </div>
+            <textarea 
+              className="w-full h-80 bg-amber-50/10 rounded-[2.5rem] p-8 text-sm outline-none shadow-inner italic" 
+              placeholder="Caro diario..." 
+              value={diaryEntry.testo} 
+              onChange={e=>setDiaryEntry({...diaryEntry, testo:e.target.value})} 
+                    />
+            <button onClick={()=>{setIsSaving(true); setTimeout(()=>setIsSaving(false),1000)}} className="w-full mt-6 py-5 rounded-[2.5rem] font-black uppercase text-xs bg-amber-500 text-white shadow-xl">
+              {isSaving ? '✅ Diario Salvato' : '💾 Salva Diario'}
+            </button>
+          </section>
+        ) : (
+          <div className="bg-white p-8 rounded-[3.5rem] text-center min-h-[400px]">
+            <h3 className="text-xs font-black uppercase text-indigo-500 mb-6 italic tracking-widest">Sincronizzazione Cloud Google Calendar</h3>
+          </div>
             )}
           </div>
         )}
