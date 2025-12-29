@@ -16,46 +16,37 @@ export default function App() {
   const [diaryEntry, setDiaryEntry] = useState({ text: "", media: [] });
   const [dayStatus, setDayStatus] = useState({ mood: '😊', weather: '☀️', saint: 'Caricamento...', proverb: 'Ricerca evento storico...' });
 
-  // 1. CARICAMENTO CHIRURGICO AL CAMBIO DATA
-  useEffect(() => {
-    setTodoList([]);
-    setNotes([]);
-    setGoogleEvents([]);
-    setDiaryEntry({ text: "", media: [] });
+  // --- STATO MODAL EVENTI ---
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [currentEvent, setCurrentEvent] = useState(null);
 
+  // 1. CARICAMENTO DATI (Logica a Cassetti per Data)
+  useEffect(() => {
     fetchHomeData();
     fetchAlmanacco(selectedDate);
-    
     const storageKey = `happyapp_v3_${selectedDate}`;
     const saved = localStorage.getItem(storageKey);
-    
     if (saved) {
       const parsed = JSON.parse(saved);
-      setTimeout(() => {
-        setTodoList(parsed.todos || []);
-        setNotes(parsed.notes || []);
-        setGoogleEvents(parsed.events || []);
-        setDiaryEntry(parsed.diary || { text: "", media: [] });
-        if(parsed.status) setDayStatus(parsed.status);
-      }, 10);
+      setTodoList(parsed.todos || []);
+      setNotes(parsed.notes || []);
+      setGoogleEvents(parsed.events || []);
+      setDiaryEntry(parsed.diary || { text: "", media: [] });
+      if(parsed.status) setDayStatus(parsed.status);
+    } else {
+      setTodoList([]); setNotes([]); setGoogleEvents([]); setDiaryEntry({ text: "", media: [] });
     }
   }, [selectedDate]);
 
-  // 2. SALVATAGGIO AUTOMATICO (Incluso Diario)
+  // 2. SALVATAGGIO AUTOMATICO TOTALE (Incluso Diario)
   useEffect(() => {
-    const dataToSave = { 
-      todos: todoList, 
-      notes: notes, 
-      events: googleEvents, 
-      diary: diaryEntry,
-      status: dayStatus
-    };
+    const dataToSave = { todos: todoList, notes, events: googleEvents, diary: diaryEntry, status: dayStatus };
     localStorage.setItem(`happyapp_v3_${selectedDate}`, JSON.stringify(dataToSave));
   }, [todoList, notes, googleEvents, diaryEntry, dayStatus, selectedDate]);
 
   const fetchHomeData = async () => {
-    const { data: medsData } = await supabase.from('medications').select('*').order('schedule_time', { ascending: true });
-    if (medsData) setMeds(medsData);
+    const { data } = await supabase.from('medications').select('*').order('schedule_time', { ascending: true });
+    if (data) setMeds(data);
   };
 
   const fetchAlmanacco = async (dateStr) => {
@@ -65,9 +56,7 @@ export default function App() {
       const data = await resp.json();
       const saint = data.holidays?.find(h => h.text.toLowerCase().includes("san") || h.text.toLowerCase().includes("santa"))?.text || "Santi del Giorno";
       setDayStatus(prev => ({ ...prev, saint: saint.split(',')[0].trim(), proverb: data.selected?.[0]?.text || "Un giorno speciale." }));
-    } catch (e) {
-      setDayStatus(prev => ({ ...prev, saint: "Santi del Giorno", proverb: "Carpe Diem." }));
-    }
+    } catch (e) { setDayStatus(prev => ({ ...prev, saint: "Santi del Giorno", proverb: "Carpe Diem." })); }
   };
 
   const changeDate = (days) => {
@@ -76,69 +65,51 @@ export default function App() {
     setSelectedDate(d.toISOString().split('T')[0]);
   };
 
-  const toggleMed = async (id, lastTaken) => {
-    const nextVal = lastTaken === selectedDate ? null : selectedDate;
-    await supabase.from('medications').update({ last_taken_date: nextVal }).eq('id', id);
-    fetchHomeData();
+  // --- LOGICA MODAL EVENTI (Sostituisce i prompt ma mantiene i campi) ---
+  const openEventModal = (event = null) => {
+    setCurrentEvent(event || {
+      id: Date.now(), title: '', date: selectedDate, startTime: '12:00', endTime: '13:00',
+      duration: '', location: '', attendees: '', description: '', link: '', meet: '',
+      recurrence: 'no', color: '#4285F4'
+    });
+    setShowEventModal(true);
   };
 
-  // --- LOGICA EVENTI COMPLETA ---
-  const editEvent = (id) => {
-    const current = id ? googleEvents.find(e => e.id === id) : {};
-    const title = prompt("1. Titolo:", current.title || "");
-    if (!title) return;
-
-    const targetDate = prompt("2. Data (YYYY-MM-DD):", current.date || selectedDate);
-    
-    const newEvent = {
-      id: id || Date.now(),
-      title,
-      date: targetDate,
-      startTime: prompt("3. Ora inizio (HH:MM):", current.startTime || "12:00"),
-      endTime: prompt("4. Ora fine (HH:MM):", current.endTime || "13:00"),
-      duration: prompt("5. Durata (es. 1h):", current.duration || ""),
-      location: prompt("6. Luogo:", current.location || ""),
-      attendees: prompt("7. Invitati (email):", current.attendees || ""),
-      description: prompt("8. Descrizione:", current.description || ""),
-      link: prompt("9. Link esterno:", current.link || ""),
-      meet: prompt("10. Meet/Zoom:", current.meet || ""),
-      recurrence: prompt("11. Ricorsività (no/giornaliera/settimanale/personalizzata):", current.recurrence || "no"),
-      color: current.color || '#4285F4'
-    };
-
-    if (targetDate !== selectedDate) {
-      const otherDayData = JSON.parse(localStorage.getItem(`happyapp_v3_${targetDate}`) || '{"events":[]}');
-      otherDayData.events = [...(otherDayData.events || []), newEvent];
-      localStorage.setItem(`happyapp_v3_${targetDate}`, JSON.stringify(otherDayData));
-      if (id) setGoogleEvents(googleEvents.filter(e => e.id !== id));
-      alert(`Sincronizzato con Google Calendar e spostato al ${targetDate}`);
+  const saveEvent = () => {
+    if (!currentEvent.title) return;
+    // Logica di spostamento tra date
+    if (currentEvent.date !== selectedDate) {
+      const otherDay = JSON.parse(localStorage.getItem(`happyapp_v3_${currentEvent.date}`) || '{"events":[]}');
+      otherDay.events = [...(otherDay.events || []), currentEvent];
+      localStorage.setItem(`happyapp_v3_${currentEvent.date}`, JSON.stringify(otherDay));
+      setGoogleEvents(googleEvents.filter(e => e.id !== currentEvent.id));
+      alert(`Impegno spostato al ${currentEvent.date}`);
     } else {
-      if (id) {
-        setGoogleEvents(googleEvents.map(e => e.id === id ? newEvent : e));
-      } else {
-        setGoogleEvents([...googleEvents, newEvent]);
-      }
+      const exists = googleEvents.find(e => e.id === currentEvent.id);
+      setGoogleEvents(exists ? googleEvents.map(e => e.id === currentEvent.id ? currentEvent : e) : [...googleEvents, currentEvent]);
     }
+    setShowEventModal(false);
   };
 
   const addMedia = (type) => {
-    const url = prompt(`Inserisci l'URL del ${type}:`);
+    const url = prompt(`Inserisci URL ${type}:`);
     if (url) setDiaryEntry(prev => ({ ...prev, media: [...prev.media, { type, url }] }));
   };
 
+  // --- RENDER SEZIONI ---
   const renderSection = (id) => {
     switch (id) {
       case 'almanacco': return (
         <section key="almanacco" className="bg-white p-8 rounded-[3rem] shadow-sm border border-indigo-50 text-center mx-2">
           <p className="text-[10px] font-black uppercase text-indigo-400 mb-2 italic">Almanacco</p>
           <h3 className="text-xl font-black text-gray-800 leading-tight">{dayStatus.saint}</h3>
-          <p className="text-[11px] text-gray-400 italic mt-2 line-clamp-3">"{dayStatus.proverb}"</p>
+          <p className="text-[11px] text-gray-400 italic mt-2">"{dayStatus.proverb}"</p>
         </section>
       );
       case 'mood': return (
         <section key="mood" className="bg-white p-6 rounded-[3rem] shadow-sm border border-indigo-50 mx-2 flex justify-around items-center">
             <div className="text-center">
-              <p className="text-[9px] font-black uppercase text-indigo-300 mb-2 italic">Meteo</p>
+              <p className="text-[9px] font-black uppercase text-indigo-300 mb-2 italic tracking-widest">Meteo</p>
               <div className="flex gap-2">
                 {['☀️', '☁️', '🌧️', '❄️', '💨'].map(w => (
                   <button key={w} onClick={() => setDayStatus({...dayStatus, weather: w})} className={`text-xl ${dayStatus.weather === w ? 'scale-125 opacity-100' : 'opacity-20'}`}>{w}</button>
@@ -146,7 +117,7 @@ export default function App() {
               </div>
             </div>
             <div className="text-center">
-              <p className="text-[9px] font-black uppercase text-indigo-300 mb-2 italic">Umore</p>
+              <p className="text-[9px] font-black uppercase text-indigo-300 mb-2 italic tracking-widest">Umore</p>
               <div className="flex gap-2">
                 {['😊', '💪', '😐', '😔', '😴'].map(m => (
                   <button key={m} onClick={() => setDayStatus({...dayStatus, mood: m})} className={`text-xl ${dayStatus.mood === m ? 'scale-125 opacity-100' : 'opacity-20'}`}>{m}</button>
@@ -157,41 +128,48 @@ export default function App() {
       );
       case 'calendar': return (
         <section key="calendar" className="bg-white p-8 rounded-[3rem] shadow-sm border border-indigo-50 mx-2 text-left">
-          <div className="flex justify-between items-center mb-4 text-left">
-            <h2 className="text-[10px] font-black uppercase text-indigo-500 italic">Google Calendar</h2>
-            <button onClick={() => editEvent()} className="bg-indigo-600 text-white w-8 h-8 rounded-full font-black text-xl shadow-lg">+</button>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-[10px] font-black uppercase text-indigo-500 italic tracking-widest">Google Calendar</h2>
+            <button onClick={() => openEventModal()} className="bg-indigo-600 text-white w-8 h-8 rounded-full font-black text-xl shadow-lg active:scale-90">+</button>
           </div>
-          {googleEvents.length > 0 ? googleEvents.map(event => (
-            <div key={event.id} onClick={() => editEvent(event.id)} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-l-[12px] mb-4" style={{ borderLeftColor: event.color }}>
+          {googleEvents.map(event => (
+            <div key={event.id} onClick={() => openEventModal(event)} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-l-[12px] mb-4 cursor-pointer hover:bg-gray-50 transition-colors" style={{ borderLeftColor: event.color }}>
               <p className="text-[10px] font-black text-indigo-400 uppercase">{event.startTime} - {event.endTime} {event.duration && `(${event.duration})`}</p>
               <h3 className="text-sm font-black text-gray-800 uppercase italic leading-tight">{event.title}</h3>
               {event.location && <p className="text-[10px] font-bold text-gray-500 mt-1 italic">📍 {event.location}</p>}
               {event.meet && <p className="text-[9px] text-blue-500 font-bold mt-1 uppercase underline">Meet: {event.meet}</p>}
             </div>
-          )) : <p className="text-xs text-gray-300 italic text-center p-4">Nessun impegno</p>}
+          ))}
         </section>
       );
       case 'todo': return (
         <section key="todo" className="bg-white p-8 rounded-[3rem] shadow-sm border border-green-50 mx-2 text-left">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-[10px] font-black uppercase text-green-500 italic">To-Do</h2>
+          <div className="flex justify-between items-center mb-4 text-left">
+            <h2 className="text-[10px] font-black uppercase text-green-500 italic tracking-widest">To-Do</h2>
             <button onClick={() => {const t=prompt("Cosa fare?"); if(t) setTodoList([...todoList,{id:Date.now(),text:t,completed:false}])}} className="bg-green-500 text-white w-8 h-8 rounded-full font-black text-xl shadow-lg">+</button>
           </div>
           {todoList.map(t => (
-            <div key={t.id} className="flex items-center gap-3 p-3 bg-green-50/10 rounded-2xl mb-2">
+            <div key={t.id} className="flex items-center gap-3 p-3 bg-green-50/10 rounded-2xl mb-2 group">
               <button onClick={() => setTodoList(todoList.map(i => i.id === t.id ? {...i, completed: !i.completed} : i))} className={`w-5 h-5 rounded border ${t.completed ? 'bg-green-500 border-green-500' : 'bg-white'}`} />
-              <span className={`text-sm font-bold flex-1 cursor-pointer ${t.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>{t.text}</span>
+              <span className={`text-sm font-bold flex-1 ${t.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>{t.text}</span>
+              <button onClick={() => setTodoList(todoList.filter(i => i.id !== t.id))} className="text-red-300 opacity-0 group-hover:opacity-100 text-xs">🗑️</button>
             </div>
           ))}
         </section>
       );
       case 'meds': return (
         <section key="meds" className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-50 mx-2 text-left">
-          <h2 className="text-[10px] font-black uppercase text-indigo-500 mb-4 italic">Farmaci</h2>
+          <h2 className="text-[10px] font-black uppercase text-indigo-500 mb-4 italic tracking-widest">Farmaci</h2>
           {meds.map(m => (
-            <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl mb-2">
-              <div><p className={`font-bold text-sm ${m.last_taken_date === selectedDate ? 'opacity-30 line-through text-green-700' : ''}`}>{m.name}</p><p className="text-[9px] font-black text-gray-300 uppercase">{m.schedule_time?.slice(0,5)}</p></div>
-              <button onClick={() => toggleMed(m.id, m.last_taken_date)} className={`w-8 h-8 rounded-full border-2 transition-all ${m.last_taken_date === selectedDate ? 'bg-green-500 border-green-500' : 'border-indigo-100'}`} />
+            <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl mb-2 group">
+              <div>
+                <p className={`font-bold text-sm ${m.last_taken_date === selectedDate ? 'opacity-30 line-through text-green-700' : ''}`}>{m.name}</p>
+                <p className="text-[9px] font-black text-gray-300 uppercase">{m.schedule_time?.slice(0,5)}</p>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={async () => {if(confirm("Eliminare?")){await supabase.from('medications').delete().eq('id',m.id); fetchHomeData();}}} className="opacity-0 group-hover:opacity-100 text-red-400 text-[10px] font-black">🗑️</button>
+                <button onClick={() => {const next=m.last_taken_date===selectedDate?null:selectedDate; supabase.from('medications').update({last_taken_date:next}).eq('id',m.id).then(fetchHomeData);}} className={`w-8 h-8 rounded-full border-2 ${m.last_taken_date === selectedDate ? 'bg-green-500 border-green-500' : 'border-indigo-100'}`} />
+              </div>
             </div>
           ))}
         </section>
@@ -199,12 +177,14 @@ export default function App() {
       case 'notes': return (
         <section key="notes" className="bg-white p-8 rounded-[3rem] shadow-sm border border-amber-100 mx-2 text-left">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-[10px] font-black uppercase text-amber-600 italic">Note</h2>
+            <h2 className="text-[10px] font-black uppercase text-amber-600 italic tracking-widest">Note</h2>
             <button onClick={() => {const t=prompt("Titolo:"); if(t) setNotes([...notes,{id:Date.now(),title:t,content:prompt("Testo:")}])}} className="bg-amber-500 text-white w-8 h-8 rounded-full font-black text-xl shadow-lg">+</button>
           </div>
           {notes.map(n => (
-            <div key={n.id} className="p-4 bg-amber-50/30 rounded-2xl mb-2">
-              <p className="font-black text-[10px] uppercase text-amber-700">{n.title}</p><p className="text-xs italic text-gray-500">{n.content}</p>
+            <div key={n.id} className="p-4 bg-amber-50/30 rounded-2xl mb-2 group relative">
+              <button onClick={() => setNotes(notes.filter(i => i.id !== n.id))} className="absolute top-2 right-4 text-red-400 text-[8px] opacity-0 group-hover:opacity-100 font-black">ELIMINA</button>
+              <p className="font-black text-[10px] uppercase text-amber-700">{n.title}</p>
+              <p className="text-xs italic text-gray-500">{n.content}</p>
             </div>
           ))}
         </section>
@@ -215,23 +195,60 @@ export default function App() {
 
   return (
     <div className="bg-[#F8F9FE] min-h-screen pb-32">
-      <header className="p-8 bg-white shadow-sm sticky top-0 z-50 rounded-b-[4rem] border-b border-indigo-50 text-center relative overflow-hidden">
-          <h1 className="text-4xl font-black italic tracking-tighter text-gray-900 leading-none mb-6">HappyApp v 2.0 ❤️</h1>
-          <button onClick={() => changeDate(-1)} className="absolute left-0 top-0 bottom-0 w-16 flex items-center justify-center text-4xl font-light text-indigo-200 z-10 active:scale-90">‹</button>
-          <div className="flex flex-col items-center"><p className="text-sm font-black text-indigo-600 uppercase">{new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p></div>
-          <button onClick={() => changeDate(1)} className="absolute right-0 top-0 bottom-0 w-16 flex items-center justify-center text-4xl font-light text-indigo-200 z-10 active:scale-90">›</button>
+      {/* HEADER */}
+      <header className="p-8 bg-white shadow-sm sticky top-0 z-40 rounded-b-[4rem] border-b border-indigo-50 text-center relative">
+          <h1 className="text-4xl font-black italic tracking-tighter text-gray-900 mb-6 uppercase">HappyApp v 2.0 ❤️</h1>
+          <button onClick={() => changeDate(-1)} className="absolute left-0 top-0 bottom-0 w-16 text-4xl font-light text-indigo-200">‹</button>
+          <p className="text-sm font-black text-indigo-600 uppercase">{new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <button onClick={() => changeDate(1)} className="absolute right-0 top-0 bottom-0 w-16 text-4xl font-light text-indigo-200">›</button>
       </header>
 
+      {/* FORM MODAL - 11 CAMPI CONTEMPORANEI */}
+      {showEventModal && (
+        <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-[3.5rem] p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xs font-black uppercase text-indigo-500 italic tracking-widest">Gestione Impegno</h2>
+              <button onClick={() => setShowEventModal(false)} className="text-gray-400 text-2xl font-light">✕</button>
+            </div>
+            <div className="space-y-4">
+              <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">1. Titolo</label><input type="text" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm font-bold border-none" value={currentEvent.title} onChange={e => setCurrentEvent({...currentEvent, title: e.target.value})} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">2. Data</label><input type="date" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.date} onChange={e => setCurrentEvent({...currentEvent, date: e.target.value})} /></div>
+                <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">Colore Card</label><input type="color" className="w-full h-12 bg-gray-50 rounded-[1.5rem] p-1 border-none cursor-pointer" value={currentEvent.color} onChange={e => setCurrentEvent({...currentEvent, color: e.target.value})} /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">3. Inizio</label><input type="time" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.startTime} onChange={e => setCurrentEvent({...currentEvent, startTime: e.target.value})} /></div>
+                <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">4. Fine</label><input type="time" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.endTime} onChange={e => setCurrentEvent({...currentEvent, endTime: e.target.value})} /></div>
+                <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">5. Durata</label><input type="text" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" placeholder="1h 30m" value={currentEvent.duration} onChange={e => setCurrentEvent({...currentEvent, duration: e.target.value})} /></div>
+              </div>
+              <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">6. Luogo</label><input type="text" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.location} onChange={e => setCurrentEvent({...currentEvent, location: e.target.value})} /></div>
+              <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">7. Invitati (email)</label><input type="text" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.attendees} onChange={e => setCurrentEvent({...currentEvent, attendees: e.target.value})} /></div>
+              <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">8. Descrizione</label><textarea className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" rows="2" value={currentEvent.description} onChange={e => setCurrentEvent({...currentEvent, description: e.target.value})} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">9. Link</label><input type="text" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.link} onChange={e => setCurrentEvent({...currentEvent, link: e.target.value})} /></div>
+                <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">10. Meet</label><input type="text" className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.meet} onChange={e => setCurrentEvent({...currentEvent, meet: e.target.value})} /></div>
+              </div>
+              <div><label className="text-[9px] font-black uppercase text-gray-400 ml-4">11. Ricorsività</label><select className="w-full bg-gray-50 rounded-[1.5rem] p-4 text-sm border-none" value={currentEvent.recurrence} onChange={e => setCurrentEvent({...currentEvent, recurrence: e.target.value})}><option value="no">No</option><option value="giornaliera">Giornaliera</option><option value="settimanale">Settimanale</option><option value="personalizzata">Personalizzata</option></select></div>
+              <div className="flex gap-4 pt-4">
+                <button onClick={saveEvent} className="flex-1 bg-indigo-600 text-white font-black p-5 rounded-[2rem] text-xs uppercase tracking-widest shadow-lg">Salva</button>
+                {currentEvent.id && <button onClick={() => {if(confirm("Eliminare?")){setGoogleEvents(googleEvents.filter(e=>e.id!==currentEvent.id)); setShowEventModal(false);}}} className="bg-red-50 text-red-500 font-black px-6 rounded-[2rem] text-[10px] uppercase">Elimina</button>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MAIN CONTENT */}
       <main className="p-6 mt-4 space-y-6">
         {activeTab === 'home' && ['almanacco', 'mood', 'calendar', 'todo', 'meds', 'notes'].map(renderSection)}
         
         {activeTab === 'agenda' && (
           <div className="space-y-6">
             <div className="flex bg-gray-100 p-1.5 rounded-[2rem] mx-2">
-              <button onClick={() => setAgendaSubTab('impegni')} className={`flex-1 py-4 rounded-[1.8rem] font-black text-[10px] uppercase ${agendaSubTab === 'impegni' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>📅 Impegni</button>
+              <button onClick={() => setAgendaSubTab('impegni')} className={`flex-1 py-4 rounded-[1.8rem] font-black text-[10px] uppercase ${agendaSubTab === 'impegni' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>📅 Impegni e Note</button>
               <button onClick={() => setAgendaSubTab('diario')} className={`flex-1 py-4 rounded-[1.8rem] font-black text-[10px] uppercase ${agendaSubTab === 'diario' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400'}`}>✍️ Diario</button>
             </div>
-
             {agendaSubTab === 'diario' ? (
               <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-amber-100 mx-2 space-y-4 text-left">
                 <div className="flex justify-between items-center">
@@ -250,12 +267,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <textarea 
-                  className="w-full h-80 bg-amber-50/20 rounded-[2rem] p-6 text-sm italic outline-none border-none focus:ring-0" 
-                  placeholder="Scrivi qui... salvo io automaticamente!" 
-                  value={diaryEntry.text} 
-                  onChange={e => setDiaryEntry({...diaryEntry, text: e.target.value})} 
-                />
+                <textarea className="w-full h-80 bg-amber-50/20 rounded-[2rem] p-6 text-sm italic outline-none border-none focus:ring-0" placeholder="Diario del giorno..." value={diaryEntry.text} onChange={e => setDiaryEntry({...diaryEntry, text: e.target.value})} />
               </section>
             ) : (
               <div className="space-y-6">
@@ -269,6 +281,7 @@ export default function App() {
         {activeTab === 'salute' && <HealthTracker />}
       </main>
 
+      {/* NAVBAR */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t p-6 flex justify-around items-center z-50 rounded-t-[3.5rem] shadow-2xl">
         <button onClick={() => setActiveTab('home')} className={`text-3xl ${activeTab === 'home' ? 'text-indigo-600 scale-125' : 'text-gray-300'}`}>🏠</button>
         <button onClick={() => setActiveTab('agenda')} className={`text-3xl ${activeTab === 'agenda' ? 'text-indigo-600 scale-125' : 'text-gray-300'}`}>📅</button>
