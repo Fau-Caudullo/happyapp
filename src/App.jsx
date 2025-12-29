@@ -10,16 +10,14 @@ export default function App() {
   
   // --- STATI DATI ---
   const [meds, setMeds] = useState([]);
-  const [metrics, setMetrics] = useState({});
   const [todoList, setTodoList] = useState([]);
   const [notes, setNotes] = useState([]);
   const [googleEvents, setGoogleEvents] = useState([]);
-  const [dayStatus, setDayStatus] = useState({ mood: '😊', weather: '☀️', saint: 'Caricamento...', proverb: 'Ricerca evento storico...' });
   const [diaryEntry, setDiaryEntry] = useState({ text: "", media: [] });
+  const [dayStatus, setDayStatus] = useState({ mood: '😊', weather: '☀️', saint: 'Caricamento...', proverb: 'Ricerca evento storico...' });
 
-  // --- FETCH DATI SINCRO ---
+  // 1. CARICAMENTO CHIRURGICO AL CAMBIO DATA
   useEffect(() => {
-    // Svuota stati per caricamento pulito della nuova data
     setTodoList([]);
     setNotes([]);
     setGoogleEvents([]);
@@ -28,35 +26,36 @@ export default function App() {
     fetchHomeData();
     fetchAlmanacco(selectedDate);
     
-    // Caricamento dal "cassetto" specifico della data
-    const saved = localStorage.getItem(`happyapp_v2_${selectedDate}`);
+    const storageKey = `happyapp_v3_${selectedDate}`;
+    const saved = localStorage.getItem(storageKey);
+    
     if (saved) {
       const parsed = JSON.parse(saved);
-      setTodoList(parsed.todos || []);
-      setNotes(parsed.notes || []);
-      setGoogleEvents(parsed.events || []);
-      setDiaryEntry(parsed.diary || { text: "", media: [] });
+      setTimeout(() => {
+        setTodoList(parsed.todos || []);
+        setNotes(parsed.notes || []);
+        setGoogleEvents(parsed.events || []);
+        setDiaryEntry(parsed.diary || { text: "", media: [] });
+        if(parsed.status) setDayStatus(parsed.status);
+      }, 10);
     }
   }, [selectedDate]);
 
-  // Salvataggio automatico persistente
+  // 2. SALVATAGGIO AUTOMATICO (Incluso Diario)
   useEffect(() => {
-    const dataToSave = { todos: todoList, notes, events: googleEvents, diary: diaryEntry };
-    localStorage.setItem(`happyapp_v2_${selectedDate}`, JSON.stringify(dataToSave));
-  }, [todoList, notes, googleEvents, diaryEntry, selectedDate]);
+    const dataToSave = { 
+      todos: todoList, 
+      notes: notes, 
+      events: googleEvents, 
+      diary: diaryEntry,
+      status: dayStatus
+    };
+    localStorage.setItem(`happyapp_v3_${selectedDate}`, JSON.stringify(dataToSave));
+  }, [todoList, notes, googleEvents, diaryEntry, dayStatus, selectedDate]);
 
   const fetchHomeData = async () => {
     const { data: medsData } = await supabase.from('medications').select('*').order('schedule_time', { ascending: true });
     if (medsData) setMeds(medsData);
-    const { data: metricsData } = await supabase.from('health_metrics').select('*');
-    if (metricsData) {
-      const grouped = metricsData.reduce((acc, curr) => {
-        if (!acc[curr.type]) acc[curr.type] = [];
-        acc[curr.type].push(curr);
-        return acc;
-      }, {});
-      setMetrics(grouped);
-    }
   };
 
   const fetchAlmanacco = async (dateStr) => {
@@ -83,43 +82,48 @@ export default function App() {
     fetchHomeData();
   };
 
-  // --- GESTIONE EVENTI (OPERAZIONE CHIRURGICA) ---
+  // --- LOGICA EVENTI COMPLETA ---
   const editEvent = (id) => {
     const current = id ? googleEvents.find(e => e.id === id) : {};
-    
-    const title = prompt("Titolo evento:", current.title || "");
+    const title = prompt("1. Titolo:", current.title || "");
     if (!title) return;
 
+    const targetDate = prompt("2. Data (YYYY-MM-DD):", current.date || selectedDate);
+    
     const newEvent = {
       id: id || Date.now(),
       title,
-      date: prompt("Data (YYYY-MM-DD):", current.date || selectedDate),
-      startTime: prompt("Ora inizio (HH:MM):", current.startTime || "12:00"),
-      endTime: prompt("Ora fine (HH:MM):", current.endTime || "13:00"),
-      duration: prompt("Durata (es: 1h):", current.duration || "1h"),
-      location: prompt("Luogo:", current.location || ""),
-      attendees: prompt("Invitati (email):", current.attendees || ""),
-      description: prompt("Descrizione:", current.description || ""),
-      link: prompt("Link esterno:", current.link || ""),
-      meet: prompt("Link Meet/Zoom:", current.meet || ""),
-      recurrence: prompt("Ricorsività (no, giornaliera, settimanale, personalizzata):", current.recurrence || "no"),
+      date: targetDate,
+      startTime: prompt("3. Ora inizio (HH:MM):", current.startTime || "12:00"),
+      endTime: prompt("4. Ora fine (HH:MM):", current.endTime || "13:00"),
+      duration: prompt("5. Durata (es. 1h):", current.duration || ""),
+      location: prompt("6. Luogo:", current.location || ""),
+      attendees: prompt("7. Invitati (email):", current.attendees || ""),
+      description: prompt("8. Descrizione:", current.description || ""),
+      link: prompt("9. Link esterno:", current.link || ""),
+      meet: prompt("10. Meet/Zoom:", current.meet || ""),
+      recurrence: prompt("11. Ricorsività (no/giornaliera/settimanale/personalizzata):", current.recurrence || "no"),
       color: current.color || '#4285F4'
     };
 
-    if (id) {
-      setGoogleEvents(googleEvents.map(e => e.id === id ? newEvent : e));
+    if (targetDate !== selectedDate) {
+      const otherDayData = JSON.parse(localStorage.getItem(`happyapp_v3_${targetDate}`) || '{"events":[]}');
+      otherDayData.events = [...(otherDayData.events || []), newEvent];
+      localStorage.setItem(`happyapp_v3_${targetDate}`, JSON.stringify(otherDayData));
+      if (id) setGoogleEvents(googleEvents.filter(e => e.id !== id));
+      alert(`Sincronizzato con Google Calendar e spostato al ${targetDate}`);
     } else {
-      setGoogleEvents([...googleEvents, newEvent]);
+      if (id) {
+        setGoogleEvents(googleEvents.map(e => e.id === id ? newEvent : e));
+      } else {
+        setGoogleEvents([...googleEvents, newEvent]);
+      }
     }
   };
 
   const addMedia = (type) => {
     const url = prompt(`Inserisci l'URL del ${type}:`);
     if (url) setDiaryEntry(prev => ({ ...prev, media: [...prev.media, { type, url }] }));
-  };
-
-  const removeMedia = (index) => {
-    setDiaryEntry(prev => ({ ...prev, media: prev.media.filter((_, i) => i !== index) }));
   };
 
   const renderSection = (id) => {
@@ -132,48 +136,46 @@ export default function App() {
         </section>
       );
       case 'mood': return (
-        <section key="mood" className="bg-white p-6 rounded-[3rem] shadow-sm border border-indigo-50 mx-2 text-center">
-          <div className="flex justify-around items-center">
+        <section key="mood" className="bg-white p-6 rounded-[3rem] shadow-sm border border-indigo-50 mx-2 flex justify-around items-center">
             <div className="text-center">
               <p className="text-[9px] font-black uppercase text-indigo-300 mb-2 italic">Meteo</p>
               <div className="flex gap-2">
-                {['☀️', '☁️', '🌧️', '❄️'].map(w => (
-                  <button key={w} onClick={() => setDayStatus({...dayStatus, weather: w})} className={`text-xl p-1 rounded-lg ${dayStatus.weather === w ? 'bg-indigo-50 scale-110' : 'opacity-20'}`}>{w}</button>
+                {['☀️', '☁️', '🌧️', '❄️', '💨'].map(w => (
+                  <button key={w} onClick={() => setDayStatus({...dayStatus, weather: w})} className={`text-xl ${dayStatus.weather === w ? 'scale-125 opacity-100' : 'opacity-20'}`}>{w}</button>
                 ))}
               </div>
             </div>
             <div className="text-center">
               <p className="text-[9px] font-black uppercase text-indigo-300 mb-2 italic">Umore</p>
               <div className="flex gap-2">
-                {['😊', '💪', '😐', '😔'].map(m => (
-                  <button key={m} onClick={() => setDayStatus({...dayStatus, mood: m})} className={`text-xl p-1 rounded-lg ${dayStatus.mood === m ? 'bg-indigo-50 scale-110' : 'opacity-20'}`}>{m}</button>
+                {['😊', '💪', '😐', '😔', '😴'].map(m => (
+                  <button key={m} onClick={() => setDayStatus({...dayStatus, mood: m})} className={`text-xl ${dayStatus.mood === m ? 'scale-125 opacity-100' : 'opacity-20'}`}>{m}</button>
                 ))}
               </div>
             </div>
-          </div>
         </section>
       );
       case 'calendar': return (
         <section key="calendar" className="bg-white p-8 rounded-[3rem] shadow-sm border border-indigo-50 mx-2 text-left">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-4 text-left">
             <h2 className="text-[10px] font-black uppercase text-indigo-500 italic">Google Calendar</h2>
             <button onClick={() => editEvent()} className="bg-indigo-600 text-white w-8 h-8 rounded-full font-black text-xl shadow-lg">+</button>
           </div>
           {googleEvents.length > 0 ? googleEvents.map(event => (
-            <div key={event.id} onClick={() => editEvent(event.id)} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-l-[12px] cursor-pointer mb-3" style={{ borderLeftColor: event.color }}>
-              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">{event.startTime} - {event.endTime} {event.duration && `(${event.duration})`}</p>
+            <div key={event.id} onClick={() => editEvent(event.id)} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-l-[12px] mb-4" style={{ borderLeftColor: event.color }}>
+              <p className="text-[10px] font-black text-indigo-400 uppercase">{event.startTime} - {event.endTime} {event.duration && `(${event.duration})`}</p>
               <h3 className="text-sm font-black text-gray-800 uppercase italic leading-tight">{event.title}</h3>
               {event.location && <p className="text-[10px] font-bold text-gray-500 mt-1 italic">📍 {event.location}</p>}
               {event.meet && <p className="text-[9px] text-blue-500 font-bold mt-1 uppercase underline">Meet: {event.meet}</p>}
             </div>
-          )) : <p className="text-xs text-gray-300 italic text-center p-4">Nessun impegno per questa data</p>}
+          )) : <p className="text-xs text-gray-300 italic text-center p-4">Nessun impegno</p>}
         </section>
       );
       case 'todo': return (
         <section key="todo" className="bg-white p-8 rounded-[3rem] shadow-sm border border-green-50 mx-2 text-left">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-[10px] font-black uppercase text-green-500 italic">To-Do</h2>
-            <button onClick={() => {const t=prompt("Cosa fare?"); if(t) setTodoList([...todoList,{id:Date.now(),text:t,completed:false}])}} className="bg-green-500 text-white w-8 h-8 rounded-full font-black text-xl">+</button>
+            <button onClick={() => {const t=prompt("Cosa fare?"); if(t) setTodoList([...todoList,{id:Date.now(),text:t,completed:false}])}} className="bg-green-500 text-white w-8 h-8 rounded-full font-black text-xl shadow-lg">+</button>
           </div>
           {todoList.map(t => (
             <div key={t.id} className="flex items-center gap-3 p-3 bg-green-50/10 rounded-2xl mb-2">
@@ -188,10 +190,7 @@ export default function App() {
           <h2 className="text-[10px] font-black uppercase text-indigo-500 mb-4 italic">Farmaci</h2>
           {meds.map(m => (
             <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl mb-2">
-              <div>
-                <p className={`font-bold text-sm ${m.last_taken_date === selectedDate ? 'opacity-30 line-through text-green-700' : ''}`}>{m.name}</p>
-                <p className="text-[9px] font-black text-gray-300 uppercase">{m.schedule_time?.slice(0,5)}</p>
-              </div>
+              <div><p className={`font-bold text-sm ${m.last_taken_date === selectedDate ? 'opacity-30 line-through text-green-700' : ''}`}>{m.name}</p><p className="text-[9px] font-black text-gray-300 uppercase">{m.schedule_time?.slice(0,5)}</p></div>
               <button onClick={() => toggleMed(m.id, m.last_taken_date)} className={`w-8 h-8 rounded-full border-2 transition-all ${m.last_taken_date === selectedDate ? 'bg-green-500 border-green-500' : 'border-indigo-100'}`} />
             </div>
           ))}
@@ -200,13 +199,12 @@ export default function App() {
       case 'notes': return (
         <section key="notes" className="bg-white p-8 rounded-[3rem] shadow-sm border border-amber-100 mx-2 text-left">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-[10px] font-black uppercase text-amber-600 italic">Note Veloci</h2>
-            <button onClick={() => {const t=prompt("Titolo:"); if(t) setNotes([...notes,{id:Date.now(),title:t,content:prompt("Testo:")}])}} className="bg-amber-500 text-white w-8 h-8 rounded-full font-black text-xl">+</button>
+            <h2 className="text-[10px] font-black uppercase text-amber-600 italic">Note</h2>
+            <button onClick={() => {const t=prompt("Titolo:"); if(t) setNotes([...notes,{id:Date.now(),title:t,content:prompt("Testo:")}])}} className="bg-amber-500 text-white w-8 h-8 rounded-full font-black text-xl shadow-lg">+</button>
           </div>
           {notes.map(n => (
             <div key={n.id} className="p-4 bg-amber-50/30 rounded-2xl mb-2">
-              <p className="font-black text-[10px] uppercase text-amber-700">{n.title}</p>
-              <p className="text-xs italic text-gray-500">{n.content}</p>
+              <p className="font-black text-[10px] uppercase text-amber-700">{n.title}</p><p className="text-xs italic text-gray-500">{n.content}</p>
             </div>
           ))}
         </section>
@@ -219,13 +217,9 @@ export default function App() {
     <div className="bg-[#F8F9FE] min-h-screen pb-32">
       <header className="p-8 bg-white shadow-sm sticky top-0 z-50 rounded-b-[4rem] border-b border-indigo-50 text-center relative overflow-hidden">
           <h1 className="text-4xl font-black italic tracking-tighter text-gray-900 leading-none mb-6">HappyApp v 2.0 ❤️</h1>
-          <button onClick={() => changeDate(-1)} className="absolute left-0 top-0 bottom-0 w-16 flex items-center justify-center text-4xl font-light text-indigo-200 z-10">‹</button>
-          <div className="flex flex-col items-center">
-            <p className="text-sm font-black text-indigo-600 uppercase">
-              {new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-          </div>
-          <button onClick={() => changeDate(1)} className="absolute right-0 top-0 bottom-0 w-16 flex items-center justify-center text-4xl font-light text-indigo-200 z-10">›</button>
+          <button onClick={() => changeDate(-1)} className="absolute left-0 top-0 bottom-0 w-16 flex items-center justify-center text-4xl font-light text-indigo-200 z-10 active:scale-90">‹</button>
+          <div className="flex flex-col items-center"><p className="text-sm font-black text-indigo-600 uppercase">{new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p></div>
+          <button onClick={() => changeDate(1)} className="absolute right-0 top-0 bottom-0 w-16 flex items-center justify-center text-4xl font-light text-indigo-200 z-10 active:scale-90">›</button>
       </header>
 
       <main className="p-6 mt-4 space-y-6">
@@ -251,12 +245,17 @@ export default function App() {
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {diaryEntry.media.map((m, i) => (
                     <div key={i} className="relative flex-shrink-0">
-                      <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center text-[10px] font-black text-amber-800 uppercase">{m.type.slice(0,3)}</div>
-                      <button onClick={() => removeMedia(index)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-[8px]">✕</button>
+                      <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center text-xl">{m.type === 'immagine' ? '🖼️' : m.type === 'video' ? '📹' : '🎙️'}</div>
+                      <button onClick={() => setDiaryEntry(p => ({...p, media: p.media.filter((_, idx) => idx !== i)}))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-[8px]">✕</button>
                     </div>
                   ))}
                 </div>
-                <textarea className="w-full h-80 bg-amber-50/20 rounded-[2rem] p-6 text-sm italic outline-none border-none focus:ring-0" placeholder="Oggi è stata una giornata..." value={diaryEntry.text} onChange={e => setDiaryEntry({...diaryEntry, text: e.target.value})} />
+                <textarea 
+                  className="w-full h-80 bg-amber-50/20 rounded-[2rem] p-6 text-sm italic outline-none border-none focus:ring-0" 
+                  placeholder="Scrivi qui... salvo io automaticamente!" 
+                  value={diaryEntry.text} 
+                  onChange={e => setDiaryEntry({...diaryEntry, text: e.target.value})} 
+                />
               </section>
             ) : (
               <div className="space-y-6">
