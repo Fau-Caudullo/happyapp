@@ -20,7 +20,6 @@ export default function App() {
   // Almanacco Dinamico
   const [almanacco, setAlmanacco] = useState({
     santo: "Caricamento...",
-    proverbio: "A ogni giorno basta la sua pena.",
     curiosita: "Ricerca eventi storici su Wikipedia..."
   });
 
@@ -44,14 +43,12 @@ export default function App() {
       const meseCap = meseString.charAt(0).toUpperCase() + meseString.slice(1);
 
       try {
-        // Fetch Wikipedia combinato (Eventi + Festività/Santi)
         const url = `https://it.wikipedia.org/api/rest_v1/feed/onthisday/all/${mese}/${giorno}`;
         const response = await fetch(url);
         const data = await response.json();
         
         setAlmanacco({
           santo: data.holidays?.[0]?.text.replace(/\[\[|\]\]/g, '') || `Oggi è il ${giorno} ${meseCap}`,
-          proverbio: "Chi ben comincia è a metà dell'opera.",
           curiosita: data.events?.[0]?.text || "Scopri la storia di oggi."
         });
       } catch (e) {
@@ -77,7 +74,8 @@ export default function App() {
   return (
     <div className="bg-[#F8F9FE] min-h-screen pb-32 font-sans text-gray-800">
       <header className="p-8 bg-white shadow-sm sticky top-0 z-40 rounded-b-[4rem] border-b text-center">
-        <h1 className="text-4xl font-black italic mb-6 uppercase tracking-tighter">HappyApp ❤️</h1>
+        {/* NOME APP AGGIORNATO */}
+        <h1 className="text-4xl font-black italic mb-6 uppercase tracking-tighter">AppyApp ❤️</h1>
         <div className="flex justify-between items-center px-4">
           <button onClick={() => {const d=new Date(selectedDate); d.setDate(d.getDate()-1); setSelectedDate(d.toISOString().split('T')[0]);}} className="text-3xl text-indigo-200">‹</button>
           <p className="text-xs font-black text-indigo-600 uppercase tracking-widest">{new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
@@ -135,18 +133,23 @@ export default function App() {
       <main className="p-6 space-y-8 max-w-2xl mx-auto">
         {activeTab === 'home' && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* 1. ALMANACCO */}
+            {/* 1. ALMANACCO CON FRASE MOTIVAZIONALE INTEGRATA */}
             <section className="bg-white p-8 rounded-[3.5rem] shadow-sm border border-indigo-50 text-left">
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-3xl">🗓️</span>
                 <h2 className="text-[10px] font-black uppercase text-indigo-500 italic tracking-widest">Almanacco del Giorno</h2>
               </div>
               <h3 className="text-xl font-black text-gray-800 leading-tight">{almanacco.santo}</h3>
-              <p className="text-sm font-bold text-indigo-400 italic my-3">"{almanacco.proverbio}"</p>
-              <div className="p-5 bg-indigo-50/50 rounded-[2.5rem] text-[11px] leading-relaxed text-gray-600">
+              
+              <div className="p-5 bg-indigo-50/50 rounded-[2.5rem] text-[11px] leading-relaxed text-gray-600 my-4">
                 <span className="font-black text-indigo-600 uppercase block mb-1">Accadde oggi:</span>
                 {almanacco.curiosita}
               </div>
+
+              {/* FRASE MOTIVAZIONALE DOPO SANTO ED EVENTO */}
+              <p className="text-sm font-black text-indigo-400 italic mt-6 text-center border-t border-indigo-50 pt-4">
+                "Fai più cose che ti rendano felice"
+              </p>
             </section>
 
             {/* 2. METEO & MOOD */}
@@ -207,13 +210,13 @@ export default function App() {
         )}
 
         {activeTab === 'agenda' && (
-          <div className="space-y-6">
+          <div className="space-y-6 text-left">
             <div className="flex bg-gray-200 p-1.5 rounded-[2.5rem]">
               <button onClick={() => setAgendaSubTab('impegni')} className={`flex-1 py-4 rounded-[2rem] font-black text-[10px] uppercase transition-all ${agendaSubTab === 'impegni' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>📅 Impegni</button>
               <button onClick={() => setAgendaSubTab('diario')} className={`flex-1 py-4 rounded-[2rem] font-black text-[10px] uppercase transition-all ${agendaSubTab === 'diario' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400'}`}>✍️ Diario</button>
             </div>
             {agendaSubTab === 'diario' ? (
-              <section className="bg-white p-8 rounded-[3.5rem] border border-amber-100 text-left">
+              <section className="bg-white p-8 rounded-[3.5rem] border border-amber-100">
                 <div className="flex gap-4 mb-6">
                   <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer">🖼️ <input type="file" className="hidden" /></label>
                   <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer">🎙️ <input type="file" className="hidden" /></label>
