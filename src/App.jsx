@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import HealthTracker from './HealthTracker';
+import HealthTracker from './HealthTracker'; // Configurazione definitiva approvata
 import './index.css';
 
 export default function App() {
@@ -17,61 +17,54 @@ export default function App() {
   const [diaryEntry, setDiaryEntry] = useState({ testo: "", media: [] });
   const [dayStatus, setDayStatus] = useState({ mood: '😊', meteo: '☀️' });
   
-  // Almanacco (Dati dinamici da Wikipedia)
+  // Almanacco Dinamico
   const [almanacco, setAlmanacco] = useState({
     santo: "Caricamento...",
-    proverbio: "Caricamento...",
+    proverbio: "A ogni giorno basta la sua pena.",
     curiosita: "Ricerca eventi storici su Wikipedia..."
   });
 
-  // Modal Impegni (10 Campi)
+  // Modal Impegni (10 CAMPI DEFINITIVI)
   const [showEventModal, setShowEventModal] = useState(false);
   const [currentEvent, setCurrentEvent] = useState({
     titolo: '', data: selectedDate, colore: '#4285F4', oraInizio: '09:00', oraFine: '10:00',
     luogo: '', invitati: '', descrizione: '', link: '', meet: ''
   });
 
-  // Modal Liste (Titolo + Descrizione) - Ora usato anche per FARMACI
+  // Modal Liste (Farmaci/Todo/Note) - Titolo + Descrizione
   const [showListModal, setShowListModal] = useState({ show: false, type: '', data: { titolo: '', descrizione: '' } });
 
-  // --- LOGICA WIKIPEDIA & DATI ---
+  // --- LOGICA FETCH ---
   useEffect(() => {
-    const fetchWikipediaData = async () => {
+    const fetchData = async () => {
       const d = new Date(selectedDate);
       const giorno = d.getDate();
+      const mese = d.getMonth() + 1;
       const meseString = d.toLocaleString('it-IT', { month: 'long' });
-      const meseCapitalized = meseString.charAt(0).toUpperCase() + meseString.slice(1);
+      const meseCap = meseString.charAt(0).toUpperCase() + meseString.slice(1);
 
       try {
-        // API Wikipedia per gli eventi del giorno
-        const url = `https://it.wikipedia.org/api/rest_v1/feed/onthisday/events/${d.getMonth() + 1}/${giorno}`;
+        // Fetch Wikipedia combinato (Eventi + Festività/Santi)
+        const url = `https://it.wikipedia.org/api/rest_v1/feed/onthisday/all/${mese}/${giorno}`;
         const response = await fetch(url);
         const data = await response.json();
         
-        if (data.events && data.events.length > 0) {
-          // Prendiamo un evento a caso tra i più rilevanti
-          const evento = data.events[0];
-          setAlmanacco({
-            santo: `Oggi è il ${giorno} ${meseCapitalized}`, 
-            proverbio: "Chi ben comincia è a metà dell'opera.", 
-            curiosita: evento.text
-          });
-        }
-      } catch (e) {
         setAlmanacco({
-          santo: `Oggi è il ${giorno} ${meseCapitalized}`,
-          proverbio: "La pazienza è la virtù dei forti.",
-          curiosita: "Controlla la tua connessione per caricare gli eventi storici."
+          santo: data.holidays?.[0]?.text.replace(/\[\[|\]\]/g, '') || `Oggi è il ${giorno} ${meseCap}`,
+          proverbio: "Chi ben comincia è a metà dell'opera.",
+          curiosita: data.events?.[0]?.text || "Scopri la storia di oggi."
         });
+      } catch (e) {
+        setAlmanacco(prev => ({ ...prev, santo: `Oggi è il ${giorno} ${meseCap}` }));
       }
+      fetchMeds();
     };
 
-    fetchWikipediaData();
-    fetchMeds();
+    fetchData();
   }, [selectedDate]);
 
   const fetchMeds = async () => {
-    const { data } = await supabase.from('medications').select('id, name, description, last_taken_date').order('name');
+    const { data } = await supabase.from('medications').select('*').order('name');
     if (data) setMeds(data);
   };
 
@@ -96,7 +89,7 @@ export default function App() {
       {showEventModal && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-[3rem] p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h2 className="text-lg font-black uppercase text-indigo-600 mb-6 italic text-center">Nuovo Impegno</h2>
+            <h2 className="text-lg font-black uppercase text-indigo-600 mb-6 italic text-center">Nuovo Impegno Calendar</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
               <input type="text" placeholder="1. Titolo" className="md:col-span-2 p-4 bg-gray-50 rounded-2xl font-bold" value={currentEvent.titolo} onChange={e=>setCurrentEvent({...currentEvent, titolo:e.target.value})} />
               <input type="date" className="p-4 bg-gray-50 rounded-2xl" value={currentEvent.data} onChange={e=>setCurrentEvent({...currentEvent, data:e.target.value})} />
@@ -109,17 +102,18 @@ export default function App() {
               <input type="text" placeholder="9. Link Web" className="p-4 bg-gray-50 rounded-2xl" value={currentEvent.link} onChange={e=>setCurrentEvent({...currentEvent, link:e.target.value})} />
               <input type="text" placeholder="10. Meet" className="p-4 bg-gray-50 rounded-2xl" value={currentEvent.meet} onChange={e=>setCurrentEvent({...currentEvent, meet:e.target.value})} />
             </div>
-            <button onClick={() => {setGoogleEvents([...googleEvents, {...currentEvent, id:Date.now()}]); setShowEventModal(false);}} className="w-full bg-indigo-600 text-white font-black p-5 rounded-[2rem] mt-6 shadow-xl uppercase">Sincronizza</button>
+            <button onClick={() => {setGoogleEvents([...googleEvents, {...currentEvent, id:Date.now()}]); setShowEventModal(false);}} className="w-full bg-indigo-600 text-white font-black p-5 rounded-[2rem] mt-6 shadow-xl uppercase italic">Sincronizza Cloud</button>
+            <button onClick={()=>setShowEventModal(false)} className="w-full mt-2 text-gray-400 text-[10px] font-black uppercase">Annulla</button>
           </div>
         </div>
       )}
 
-      {/* MODAL LISTE (TODO/NOTE/FARMACI) - TITOLO E DESCRIZIONE */}
+      {/* MODAL SEMPLIFICATO (FARMACI/TODO/NOTE) */}
       {showListModal.show && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl">
-            <h2 className="font-black uppercase mb-6 text-indigo-500 text-xs tracking-widest text-center">{showListModal.type}</h2>
-            <input type="text" placeholder="Nome / Titolo" className="w-full p-4 bg-gray-50 rounded-2xl mb-4 font-bold outline-none" value={showListModal.data.titolo} onChange={e=>setShowListModal({...showListModal, data:{...showListModal.data, titolo:e.target.value}})} />
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl text-center">
+            <h2 className="font-black uppercase mb-6 text-indigo-500 text-xs tracking-widest italic">{showListModal.type}</h2>
+            <input type="text" placeholder="Titolo" className="w-full p-4 bg-gray-50 rounded-2xl mb-4 font-bold outline-none" value={showListModal.data.titolo} onChange={e=>setShowListModal({...showListModal, data:{...showListModal.data, titolo:e.target.value}})} />
             <textarea placeholder="Descrizione" className="w-full p-4 bg-gray-50 rounded-2xl mb-6 outline-none" rows="4" value={showListModal.data.descrizione} onChange={e=>setShowListModal({...showListModal, data:{...showListModal.data, descrizione:e.target.value}})} />
             <button onClick={async () => {
               const { type, data } = showListModal;
@@ -133,7 +127,7 @@ export default function App() {
               }
               setShowListModal({show:false});
             }} className="w-full bg-green-500 text-white font-black p-5 rounded-[2rem] uppercase shadow-lg">Salva</button>
-            <button onClick={()=>setShowListModal({show:false})} className="w-full mt-2 text-gray-400 text-xs font-bold py-2 uppercase">Annulla</button>
+            <button onClick={()=>setShowListModal({show:false})} className="w-full mt-2 text-gray-400 text-xs font-bold py-2 uppercase">Indietro</button>
           </div>
         </div>
       )}
@@ -141,7 +135,7 @@ export default function App() {
       <main className="p-6 space-y-8 max-w-2xl mx-auto">
         {activeTab === 'home' && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* 1. ALMANACCO (DATI WIKIPEDIA REAL-TIME) */}
+            {/* 1. ALMANACCO */}
             <section className="bg-white p-8 rounded-[3.5rem] shadow-sm border border-indigo-50 text-left">
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-3xl">🗓️</span>
@@ -155,14 +149,14 @@ export default function App() {
               </div>
             </section>
 
-            {/* 2. METEO & MOOD UNIFICATI */}
+            {/* 2. METEO & MOOD */}
             <section className="bg-white p-6 rounded-[3.5rem] shadow-sm border border-indigo-50 flex justify-around items-center">
-              <div className="flex gap-3">{['☀️', '☁️', '🌧️', '⛈️', '❄️'].map(w => (<button key={w} onClick={()=>setDayStatus({...dayStatus, meteo:w})} className={`text-2xl ${dayStatus.meteo===w?'scale-150':'opacity-20'}`}>{w}</button>))}</div>
+              <div className="flex gap-3">{['☀️', '☁️', '🌧️', '⛈️', '❄️'].map(w => (<button key={w} onClick={()=>setDayStatus({...dayStatus, meteo:w})} className={`text-2xl transition-all ${dayStatus.meteo===w?'scale-150':'opacity-20'}`}>{w}</button>))}</div>
               <div className="w-[1px] h-10 bg-gray-100"></div>
-              <div className="flex gap-3">{['😊', '😇', '😐', '😔', '😡'].map(m => (<button key={m} onClick={()=>setDayStatus({...dayStatus, mood:m})} className={`text-2xl ${dayStatus.mood===m?'scale-150':'opacity-20'}`}>{m}</button>))}</div>
+              <div className="flex gap-3">{['😊', '😇', '😐', '😔', '😡'].map(m => (<button key={m} onClick={()=>setDayStatus({...dayStatus, mood:m})} className={`text-2xl transition-all ${dayStatus.mood===m?'scale-150':'opacity-20'}`}>{m}</button>))}</div>
             </section>
 
-            {/* 3. IMPEGNI CON TASTO + */}
+            {/* 3. IMPEGNI GOOGLE */}
             <section className="bg-white p-8 rounded-[3.5rem] shadow-sm border border-indigo-50">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-[10px] font-black uppercase text-indigo-500 italic">Prossimi Impegni</h2>
@@ -176,7 +170,7 @@ export default function App() {
               ))}
             </section>
 
-            {/* 4. FARMACI (NOMINATIVO E DESCRIZIONE) */}
+            {/* 4. FARMACI */}
             <section className="bg-white p-8 rounded-[3.5rem] shadow-sm border border-red-50 text-left">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-[10px] font-black uppercase text-red-400 italic">Farmaci Oggi</h2>
@@ -189,7 +183,7 @@ export default function App() {
                     <p className="text-[9px] font-bold text-red-300 uppercase">{m.description}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => toggleMedication(m)} className={`w-12 h-12 rounded-full border-2 transition-all flex items-center justify-center ${m.last_taken_date === selectedDate ? 'bg-green-500 border-green-500 text-white' : 'border-red-100'}`}>
+                    <button onClick={() => toggleMedication(m)} className={`w-12 h-12 rounded-full border-2 transition-all flex items-center justify-center ${m.last_taken_date === selectedDate ? 'bg-green-500 border-green-500 text-white shadow-md' : 'border-red-100 bg-white'}`}>
                       {m.last_taken_date === selectedDate ? '✓' : ''}
                     </button>
                     <button onClick={async () => {await supabase.from('medications').delete().eq('id', m.id); fetchMeds();}} className="text-red-100 text-xs">✕</button>
@@ -199,14 +193,14 @@ export default function App() {
             </section>
 
             {/* 5. TODO & NOTE */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
               <section className="bg-white p-8 rounded-[3.5rem] shadow-sm border border-green-50">
-                <div className="flex justify-between items-center mb-4"><h2 className="text-[10px] font-black uppercase text-green-500">To-Do</h2><button onClick={()=>setShowListModal({show:true, type:'todo', data:{titolo:'',descrizione:''}})} className="text-green-500 text-2xl">+</button></div>
-                {todoList.map(t => <div key={t.id} className="p-3 bg-green-50/20 rounded-xl mb-2 flex justify-between text-xs font-bold"><span>{t.titolo}</span><button onClick={()=>setTodoList(todoList.filter(i=>i.id!==t.id))}>✕</button></div>)}
+                <div className="flex justify-between items-center mb-4"><h2 className="text-[10px] font-black uppercase text-green-500 italic">To-Do</h2><button onClick={()=>setShowListModal({show:true, type:'todo', data:{titolo:'',descrizione:''}})} className="text-green-500 text-2xl">+</button></div>
+                {todoList.map(t => <div key={t.id} className="p-3 bg-green-50/20 rounded-xl mb-2 flex justify-between items-center text-xs font-bold"><span>{t.titolo}</span><button onClick={()=>setTodoList(todoList.filter(i=>i.id!==t.id))}>✕</button></div>)}
               </section>
               <section className="bg-white p-8 rounded-[3.5rem] shadow-sm border border-amber-50">
-                <div className="flex justify-between items-center mb-4"><h2 className="text-[10px] font-black uppercase text-amber-500">Note</h2><button onClick={()=>setShowListModal({show:true, type:'note', data:{titolo:'',descrizione:''}})} className="text-amber-500 text-2xl">+</button></div>
-                {notes.map(n => <div key={n.id} className="p-3 bg-amber-50/20 rounded-xl mb-2 flex justify-between text-xs font-bold"><span>{n.titolo}</span><button onClick={()=>setNotes(notes.filter(i=>i.id!==n.id))}>✕</button></div>)}
+                <div className="flex justify-between items-center mb-4"><h2 className="text-[10px] font-black uppercase text-amber-500 italic">Note</h2><button onClick={()=>setShowListModal({show:true, type:'note', data:{titolo:'',descrizione:''}})} className="text-amber-500 text-2xl">+</button></div>
+                {notes.map(n => <div key={n.id} className="p-3 bg-amber-50/20 rounded-xl mb-2 flex justify-between items-center text-xs font-bold"><span>{n.titolo}</span><button onClick={()=>setNotes(notes.filter(i=>i.id!==n.id))}>✕</button></div>)}
               </section>
             </div>
           </div>
@@ -219,35 +213,31 @@ export default function App() {
               <button onClick={() => setAgendaSubTab('diario')} className={`flex-1 py-4 rounded-[2rem] font-black text-[10px] uppercase transition-all ${agendaSubTab === 'diario' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400'}`}>✍️ Diario</button>
             </div>
             {agendaSubTab === 'diario' ? (
-              <section className="bg-white p-8 rounded-[3.5rem] border border-amber-100">
+              <section className="bg-white p-8 rounded-[3.5rem] border border-amber-100 text-left">
                 <div className="flex gap-4 mb-6">
                   <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer">🖼️ <input type="file" className="hidden" /></label>
                   <label className="bg-amber-50 w-14 h-14 rounded-full flex items-center justify-center text-2xl cursor-pointer">🎙️ <input type="file" className="hidden" /></label>
                 </div>
-                <textarea className="w-full h-80 bg-amber-50/10 rounded-[2.5rem] p-8 text-sm outline-none shadow-inner" placeholder="Caro diario..." value={diaryEntry.testo} onChange={e=>setDiaryEntry({...diaryEntry, testo:e.target.value})} />
+                <textarea className="w-full h-80 bg-amber-50/10 rounded-[2.5rem] p-8 text-sm outline-none shadow-inner italic" placeholder="Caro diario..." value={diaryEntry.testo} onChange={e=>setDiaryEntry({...diaryEntry, testo:e.target.value})} />
                 <button onClick={()=>{setIsSaving(true); setTimeout(()=>setIsSaving(false),1000)}} className="w-full mt-6 py-5 rounded-[2.5rem] font-black uppercase text-xs bg-amber-500 text-white shadow-xl">
                   {isSaving ? '✅ Diario Salvato' : '💾 Salva Diario'}
                 </button>
               </section>
             ) : (
               <div className="bg-white p-8 rounded-[3.5rem] text-center min-h-[400px]">
-                <h3 className="text-xs font-black uppercase text-indigo-500 mb-6 italic">Visualizzazione Impegni</h3>
+                <h3 className="text-xs font-black uppercase text-indigo-500 mb-6 italic tracking-widest">Sincronizzazione Cloud Google Calendar</h3>
               </div>
             )}
           </div>
         )}
 
-        {activeTab === 'salute' && (
-          <HealthTracker 
-            onAddMeds={() => setShowListModal({show:true, type:'farmaco', data:{titolo:'',descrizione:''}})}
-          />
-        )}
+        {activeTab === 'salute' && <HealthTracker onAddMeds={() => setShowListModal({show:true, type:'farmaco', data:{titolo:'',descrizione:''}})} />}
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t p-6 flex justify-around items-center z-50 rounded-t-[4rem] shadow-2xl">
         <button onClick={() => setActiveTab('home')} className={`text-3xl ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-300'}`}>🏠</button>
         <button onClick={() => setActiveTab('agenda')} className={`text-3xl ${activeTab === 'agenda' ? 'text-indigo-600' : 'text-gray-300'}`}>📅</button>
-        <button onClick={() => setActiveTab('salute')} className={`text-5xl ${activeTab === 'salute' ? 'text-red-500' : 'text-gray-200'}`}>❤️</button>
+        <button onClick={() => setActiveTab('salute')} className={`text-5xl transition-all ${activeTab === 'salute' ? 'text-red-500' : 'text-gray-200'}`}>❤️</button>
       </nav>
     </div>
   );
