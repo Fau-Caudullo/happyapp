@@ -1,1 +1,10 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Eventuali altri tuoi stili personalizzati sotto */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f8fafc;
+}
