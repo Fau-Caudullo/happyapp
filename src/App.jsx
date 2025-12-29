@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import HealthTracker from './HealthTracker';
-import './index.css'; // <--- FONDAMENTALE PER LO STILE
+import './index.css'; 
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -11,15 +11,9 @@ export default function App() {
   // --- STATI DATI ---
   const [meds, setMeds] = useState([]);
   const [metrics, setMetrics] = useState({});
-  const [todoList, setTodoList] = useState([{ id: 1, text: 'Comprare il pane', completed: false }]);
-  const [notes, setNotes] = useState([{ id: 1, title: 'Nota', content: 'Contenuto' }]);
-  const [googleEvents, setGoogleEvents] = useState([
-    { 
-      id: 'g1', title: 'Visita Specialistica', time: '10:30', duration: '45m', 
-      location: 'Via Roma 12, Milano', description: 'Portare esami precedenti', 
-      color: '#4285F4', notifications: '15m prima', attendees: 'Dott. Bianchi' 
-    }
-  ]);
+  const [todoList, setTodoList] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [googleEvents, setGoogleEvents] = useState([]);
   
   const [dayStatus, setDayStatus] = useState({ mood: '😊', weather: '☀️', saint: 'Caricamento...', proverb: 'Ricerca evento storico...' });
   const [diaryEntry, setDiaryEntry] = useState({ text: "", media: [] });
@@ -29,7 +23,33 @@ export default function App() {
   useEffect(() => {
     fetchHomeData();
     fetchAlmanacco(selectedDate);
+    fetchDataByDate(selectedDate); 
   }, [selectedDate]);
+
+  // Caricamento dati locali per data (Impegni, Note, Diario)
+  const fetchDataByDate = (dateStr) => {
+    const savedData = localStorage.getItem(`happyapp_${dateStr}`);
+    if (savedData) {
+      const parsed = JSON.parse(savedData);
+      setTodoList(parsed.todos || []);
+      setNotes(parsed.notes || []);
+      setGoogleEvents(parsed.events || []);
+      setDiaryEntry(parsed.diary || { text: "", media: [] });
+    } else {
+      setTodoList([]);
+      setNotes([]);
+      setGoogleEvents([]);
+      setDiaryEntry({ text: "", media: [] });
+    }
+  };
+
+  // Salvataggio automatico nel localStorage
+  useEffect(() => {
+    if (selectedDate) {
+      const dataToSave = { todos: todoList, notes, events: googleEvents, diary: diaryEntry };
+      localStorage.setItem(`happyapp_${selectedDate}`, JSON.stringify(dataToSave));
+    }
+  }, [todoList, notes, googleEvents, diaryEntry, selectedDate]);
 
   const fetchHomeData = async () => {
     const { data: medsData } = await supabase.from('medications').select('*').order('schedule_time', { ascending: true });
@@ -91,6 +111,7 @@ export default function App() {
   };
   const cycleDay = getCycleDay();
 
+  // Logica Farmaci: Sincronizzata con la data selezionata
   const toggleMed = async (id, lastTaken) => {
     const nextVal = lastTaken === selectedDate ? null : selectedDate;
     await supabase.from('medications').update({ last_taken_date: nextVal }).eq('id', id);
@@ -177,13 +198,13 @@ export default function App() {
       case 'calendar': return (
         <section key="calendar" className="bg-white p-8 rounded-[3rem] shadow-sm border border-indigo-50 mx-2 text-left">
           <h2 className="text-[10px] font-black uppercase text-indigo-500 mb-4 italic">Prossimo Impegno</h2>
-          {googleEvents.slice(0, 1).map(event => (
+          {googleEvents.length > 0 ? googleEvents.slice(0, 1).map(event => (
             <div key={event.id} onClick={() => editEvent(event.id)} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-l-[12px] cursor-pointer" style={{ borderLeftColor: event.color }}>
               <p className="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">{event.time}</p>
               <h3 className="text-sm font-black text-gray-800 uppercase italic leading-tight">{event.title}</h3>
               {event.location && <p className="text-[10px] font-bold text-gray-500">📍 {event.location}</p>}
             </div>
-          ))}
+          )) : <p className="text-xs text-gray-300 italic text-center p-4">Nessun impegno per oggi</p>}
         </section>
       );
       case 'todo': return (
@@ -276,7 +297,7 @@ export default function App() {
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {diaryEntry.media.map((m, i) => (
                     <div key={i} className="relative flex-shrink-0">
-                      <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center text-xs font-black">Media</div>
+                      <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center text-[10px] font-black text-amber-800">{m.type}</div>
                       <button onClick={() => removeMedia(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-[8px]">✕</button>
                     </div>
                   ))}
@@ -289,14 +310,14 @@ export default function App() {
                    <h2 className="text-[10px] font-black text-indigo-500 uppercase italic">Agenda</h2>
                    <button onClick={() => editEvent()} className="bg-indigo-600 text-white px-4 py-2 rounded-full font-black text-[10px] uppercase">+ Impegno</button>
                 </div>
-                {googleEvents.map(event => (
+                {googleEvents.length > 0 ? googleEvents.map(event => (
                   <div key={event.id} onClick={() => editEvent(event.id)} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-l-[12px] cursor-pointer" style={{ borderLeftColor: event.color }}>
                     <p className="text-[10px] font-black text-indigo-400 uppercase">{event.time} • {event.duration}</p>
                     <h3 className="text-sm font-black text-gray-800 uppercase italic">{event.title}</h3>
-                    <p className="text-[10px] font-bold text-gray-500">📍 {event.location}</p>
-                    <p className="text-[10px] text-gray-400 mt-2 italic line-clamp-2">{event.description}</p>
+                    {event.location && <p className="text-[10px] font-bold text-gray-500">📍 {event.location}</p>}
+                    {event.description && <p className="text-[10px] text-gray-400 mt-2 italic line-clamp-2">{event.description}</p>}
                   </div>
-                ))}
+                )) : <p className="text-center text-gray-300 italic p-10 text-xs">Agenda vuota per oggi</p>}
                 <div className="pt-4 border-t border-gray-100 space-y-6">
                    {renderSection('todo')}
                    {renderSection('notes')}
@@ -316,5 +337,3 @@ export default function App() {
     </div>
   );
 }
-
-
