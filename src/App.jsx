@@ -178,7 +178,7 @@ export default function App() {
                 </div>
                 <textarea className="w-full h-80 bg-amber-50/10 rounded-[2.5rem] p-8 text-sm outline-none shadow-inner italic" placeholder="Cosa è successo oggi?" value={diaryEntry.testo} onChange={e=>setDiaryEntry({...diaryEntry, testo:e.target.value})} />
                 <button onClick={()=>{setIsSaving(true); setTimeout(()=>setIsSaving(false),1000)}} className={`w-full mt-6 py-5 rounded-[2.5rem] font-black uppercase text-xs shadow-xl transition-all ${isSaving ? 'bg-green-500 text-white' : 'bg-amber-500 text-white'}`}>
-                  {isSaving ? '✅ Diario Salvato' : '💾 Forza Salvataggio'}
+                  {isSaving ? '✅ Diario Salvato' : '💾 Salva'}
                 </button>
               </section>
             ) : (
