@@ -8,6 +8,7 @@ export default function App() {
   const [agendaSubTab, setAgendaSubTab] = useState('impegni');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
+  // STATI DATI (Configurazione 28-29 Dicembre)
   const [meds, setMeds] = useState([]);
   const [todoList, setTodoList] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -15,7 +16,7 @@ export default function App() {
   const [diaryEntry, setDiaryEntry] = useState({ text: "", media: [] });
   const [dayStatus, setDayStatus] = useState({ mood: '😊', weather: '☀️', saint: 'Santi del Giorno', proverb: 'Carpe Diem.' });
 
-  // STATO MODAL
+  // STATO MODAL (FORM GRAFICO)
   const [showEventModal, setShowEventModal] = useState(false);
   const [currentEvent, setCurrentEvent] = useState(null);
 
@@ -43,6 +44,7 @@ export default function App() {
     if (data) setMeds(data);
   };
 
+  // APERTURA FORM GRAFICO (Sostituisce il prompt dello screenshot)
   const openEventModal = (event = null) => {
     if (event) {
       setCurrentEvent({ ...event, isEditing: true });
@@ -63,6 +65,11 @@ export default function App() {
     setShowEventModal(false);
   };
 
+  const deleteEvent = () => {
+    setGoogleEvents(googleEvents.filter(e => e.id !== currentEvent.id));
+    setShowEventModal(false);
+  };
+
   return (
     <div className="bg-[#F8F9FE] min-h-screen pb-32">
       <header className="p-8 bg-white shadow-sm sticky top-0 z-40 rounded-b-[4rem] border-b border-indigo-50 text-center">
@@ -74,7 +81,7 @@ export default function App() {
           </div>
       </header>
 
-      {/* --- FORM GRAFICO (NESSUN PROMPT) --- */}
+      {/* --- IL NUOVO FORM GRAFICO (TUTTI I CAMPI INSIEME) --- */}
       {showEventModal && (
         <div className="fixed inset-0 z-[999] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xl rounded-[3rem] p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
@@ -94,7 +101,7 @@ export default function App() {
                 <input type="date" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.date} onChange={e => setCurrentEvent({...currentEvent, date: e.target.value})} />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Colore Etichetta</label>
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Colore</label>
                 <input type="color" className="w-full h-12 bg-gray-50 rounded-2xl border-none outline-none cursor-pointer" value={currentEvent.color} onChange={e => setCurrentEvent({...currentEvent, color: e.target.value})} />
               </div>
 
@@ -109,33 +116,33 @@ export default function App() {
 
               <div className="md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">5. Luogo</label>
-                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.location} onChange={e => setCurrentEvent({...currentEvent, location: e.target.value})} placeholder="Indirizzo o ufficio" />
+                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.location} onChange={e => setCurrentEvent({...currentEvent, location: e.target.value})} placeholder="Indirizzo" />
               </div>
 
               <div className="md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">6. Invitati</label>
-                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.attendees} onChange={e => setCurrentEvent({...currentEvent, attendees: e.target.value})} placeholder="Nomi dei partecipanti" />
+                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.attendees} onChange={e => setCurrentEvent({...currentEvent, attendees: e.target.value})} placeholder="Nomi partecipanti" />
               </div>
 
               <div className="md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">7. Descrizione</label>
-                <textarea className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" rows="2" value={currentEvent.description} onChange={e => setCurrentEvent({...currentEvent, description: e.target.value})} placeholder="Note aggiuntive..." />
+                <textarea className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" rows="2" value={currentEvent.description} onChange={e => setCurrentEvent({...currentEvent, description: e.target.value})} placeholder="Note..." />
               </div>
 
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">8. Link</label>
-                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.link} onChange={e => setCurrentEvent({...currentEvent, link: e.target.value})} placeholder="https://..." />
+                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.link} onChange={e => setCurrentEvent({...currentEvent, link: e.target.value})} placeholder="Sito web" />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">9. Meet</label>
-                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.meet} onChange={e => setCurrentEvent({...currentEvent, meet: e.target.value})} placeholder="Codice meeting" />
+                <input type="text" className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.meet} onChange={e => setCurrentEvent({...currentEvent, meet: e.target.value})} placeholder="Codice Meet" />
               </div>
 
               <div className="md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-gray-400 ml-2">10. Ricorsività</label>
                 <select className="w-full bg-gray-50 rounded-2xl p-4 text-sm border-none outline-none" value={currentEvent.recurrence} onChange={e => setCurrentEvent({...currentEvent, recurrence: e.target.value})}>
-                  <option value="no">Evento Singolo</option>
-                  <option value="weekly">Ogni Settimana</option>
+                  <option value="no">No</option>
+                  <option value="weekly">Settimanale</option>
                 </select>
               </div>
             </div>
@@ -143,7 +150,7 @@ export default function App() {
             <div className="flex flex-col gap-3 mt-8 pt-6 border-t">
               <button onClick={saveEvent} className="w-full bg-indigo-600 text-white font-black p-5 rounded-3xl text-sm uppercase shadow-xl hover:bg-indigo-700">Salva Modifiche</button>
               {currentEvent.isEditing && (
-                <button onClick={() => {setGoogleEvents(googleEvents.filter(e=>e.id!==currentEvent.id)); setShowEventModal(false);}} className="w-full bg-red-50 text-red-500 font-black p-4 rounded-3xl text-xs uppercase border border-red-100">Elimina Impegno definitivamente</button>
+                <button onClick={deleteEvent} className="w-full bg-red-50 text-red-500 font-black p-4 rounded-3xl text-xs uppercase border border-red-100">Elimina Impegno</button>
               )}
             </div>
           </div>
@@ -152,19 +159,14 @@ export default function App() {
 
       <main className="p-6 space-y-6">
         {activeTab === 'home' && (
-          <>
-            <section className="bg-white p-6 rounded-[2.5rem] shadow-sm text-center">
-              <h3 className="text-xl font-black text-gray-800 leading-tight">{dayStatus.saint}</h3>
-              <p className="text-[11px] text-gray-400 italic mt-1">"{dayStatus.proverb}"</p>
-            </section>
-
-            <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-indigo-50">
+          <div className="space-y-6">
+            <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-indigo-50 mx-2">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-[10px] font-black uppercase text-indigo-500 italic">Upcoming Event</h2>
                 <button onClick={() => openEventModal()} className="bg-indigo-600 text-white w-12 h-12 rounded-full font-black text-2xl shadow-lg">+</button>
               </div>
               {googleEvents.map(event => (
-                <div key={event.id} onClick={() => openEventModal(event)} className="bg-white p-6 rounded-[2rem] shadow-sm border-l-[12px] mb-4 cursor-pointer hover:bg-gray-50 transition-all" style={{ borderLeftColor: event.color }}>
+                <div key={event.id} onClick={() => openEventModal(event)} className="bg-white p-6 rounded-[2rem] shadow-sm border-l-[12px] mb-4 cursor-pointer" style={{ borderLeftColor: event.color }}>
                   <p className="text-[10px] font-black text-indigo-400 uppercase">{event.startTime} - {event.endTime}</p>
                   <h3 className="text-sm font-black text-gray-800 uppercase italic leading-tight">{event.title}</h3>
                 </div>
@@ -172,37 +174,29 @@ export default function App() {
             </section>
 
             <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-green-50">
-              <h2 className="text-[10px] font-black uppercase text-green-500 italic mb-4">To-Do</h2>
-              {todoList.map(t => (
-                <div key={t.id} className="flex items-center gap-3 p-3 bg-green-50/10 rounded-2xl mb-2">
-                   <input className="text-sm font-bold flex-1 bg-transparent border-none outline-none" value={t.text} onChange={e => setTodoList(todoList.map(i=>i.id===t.id?{...i, text:e.target.value}:i))} placeholder="Nuova attività..." />
-                </div>
-              ))}
-              <button onClick={() => setTodoList([...todoList, {id: Date.now(), text: "", completed: false}])} className="text-green-500 font-black text-[10px] uppercase mt-2">+ Aggiungi Task</button>
-            </section>
-
-            <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
-               <h2 className="text-[10px] font-black uppercase text-gray-400 mb-4 italic">Medications</h2>
-               {meds.map(m => (
-                 <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl mb-2">
-                   <p className="font-bold text-sm">{m.name}</p>
-                   <button onClick={() => {const next=m.last_taken_date===selectedDate?null:selectedDate; supabase.from('medications').update({last_taken_date:next}).eq('id',m.id).then(fetchHomeData);}} className={`w-8 h-8 rounded-full border-2 ${m.last_taken_date === selectedDate ? 'bg-green-500' : 'border-indigo-100'}`} />
+               <h2 className="text-[10px] font-black uppercase text-green-500 italic mb-4">To-Do</h2>
+               {todoList.map(t => (
+                 <div key={t.id} className="flex items-center gap-3 p-3 bg-green-50/10 rounded-2xl mb-2">
+                    <input className="text-sm font-bold flex-1 bg-transparent border-none outline-none" value={t.text} onChange={e => setTodoList(todoList.map(i=>i.id===t.id?{...i, text:e.target.value}:i))} placeholder="Scrivi..." />
+                    <button onClick={() => setTodoList(todoList.filter(i => i.id !== t.id))} className="text-red-400">✕</button>
                  </div>
                ))}
+               <button onClick={() => setTodoList([...todoList, {id: Date.now(), text: "", completed: false}])} className="text-green-500 font-black text-[10px] uppercase mt-2">+ Aggiungi</button>
             </section>
-          </>
+          </div>
         )}
         
         {activeTab === 'agenda' && (
           <div className="space-y-6">
-            <div className="flex bg-gray-200 p-1 rounded-[2rem] mx-2">
+             {/* Visualizzazione unificata approvata il 28/12 */}
+             <div className="flex bg-gray-200 p-1 rounded-[2rem] mx-2">
               <button onClick={() => setAgendaSubTab('impegni')} className={`flex-1 py-4 rounded-[1.8rem] font-black text-[10px] uppercase ${agendaSubTab === 'impegni' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>📅 Agenda</button>
               <button onClick={() => setAgendaSubTab('diario')} className={`flex-1 py-4 rounded-[1.8rem] font-black text-[10px] uppercase ${agendaSubTab === 'diario' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-400'}`}>✍️ Diario</button>
             </div>
             {agendaSubTab === 'impegni' ? (
-              <div className="space-y-6">
+              <div className="space-y-4 mx-2">
                 {googleEvents.map(event => (
-                  <div key={event.id} onClick={() => openEventModal(event)} className="bg-white p-6 rounded-[2.5rem] shadow-sm border-l-[12px] mx-2 cursor-pointer" style={{ borderLeftColor: event.color }}>
+                  <div key={event.id} onClick={() => openEventModal(event)} className="bg-white p-6 rounded-[2rem] shadow-sm border-l-[12px] cursor-pointer" style={{ borderLeftColor: event.color }}>
                     <p className="text-[10px] font-black text-indigo-400 uppercase">{event.startTime} - {event.endTime}</p>
                     <h3 className="text-sm font-black text-gray-800 uppercase italic leading-tight">{event.title}</h3>
                   </div>
@@ -210,7 +204,12 @@ export default function App() {
               </div>
             ) : (
               <section className="bg-white p-8 rounded-[3rem] shadow-sm border border-amber-100 mx-2">
-                <textarea className="w-full h-80 bg-amber-50/20 rounded-[2rem] p-6 text-sm italic outline-none border-none" placeholder="Oggi è stato..." value={diaryEntry.text} onChange={e=>setDiaryEntry({...diaryEntry, text:e.target.value})} />
+                <div className="flex gap-4 mb-4">
+                  <button onClick={() => setDiaryEntry(p=>({...p, media:[...p.media, {type:'img',url:''}]}))} className="text-2xl">🖼️</button>
+                  <button onClick={() => setDiaryEntry(p=>({...p, media:[...p.media, {type:'vid',url:''}]}))} className="text-2xl">📹</button>
+                  <button onClick={() => setDiaryEntry(p=>({...p, media:[...p.media, {type:'aud',url:''}]}))} className="text-2xl">🎙️</button>
+                </div>
+                <textarea className="w-full h-80 bg-amber-50/20 rounded-[2rem] p-6 text-sm italic outline-none border-none" placeholder="Oggi..." value={diaryEntry.text} onChange={e=>setDiaryEntry({...diaryEntry, text:e.target.value})} />
               </section>
             )}
           </div>
